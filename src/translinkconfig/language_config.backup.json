@@ -6,7 +6,7 @@
   },
   "en": {
     "global": {
-      "brand": "TRANSLINK",
+      "brand": "TRANSLINK a",
       "audio": "AUDIO",
       "audio_on": "ON",
       "audio_off": "OFF",
@@ -25,7 +25,7 @@
       "s1": {
         "id": "s1",
         "sidebar_label": "Section _ 01 // Hero",
-        "vertical_title": "TRNSLINK",
+        "vertical_title": "TRNSLINK A",
         "hero_part1": "Advanced ",
         "hero_part2": "Telematics:",
         "hero_part3": "One-Stop Solution",
