@@ -114,53 +114,62 @@ for (const [routePath, cfg] of Object.entries(CMS_ROUTES)) {
 
   // POST — write config file (rate-limited + auth-gated in production)
   router.post(routePath, requireCmsWrite, (req: Request, res: Response) => {
-    try {
-      let body = '';
-      req.on('data', (chunk) => { body += chunk; });
-      req.on('end', () => {
-        try {
-          if (cfg.requiredKey !== null) {
-            // JSON config — validate required root key
-            let payload: any;
-            try {
-              payload = JSON.parse(body);
-            } catch {
-              res.status(400).json({ error: 'Invalid JSON payload' });
-              return;
-            }
-            if (!payload || typeof payload !== 'object' || !payload[cfg.requiredKey]) {
-              res.status(400).json({
-                error: `Invalid config payload: missing required key '${cfg.requiredKey}'`,
-              });
-              return;
-            }
-            // Backup existing file
-            if (fs.existsSync(configFilePath)) {
-              fs.copyFileSync(configFilePath, backupFilePath);
-            }
-            fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
-            fs.writeFileSync(configFilePath, JSON.stringify(payload, null, 2), 'utf8');
-          } else {
-            // Plain text (markdown)
-            if (fs.existsSync(configFilePath)) {
-              fs.copyFileSync(configFilePath, backupFilePath);
-            }
-            fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
-            fs.writeFileSync(configFilePath, body, 'utf8');
+    let body = '';
+    
+    req.on('data', (chunk) => { 
+      body += chunk.toString(); 
+    });
+    
+    req.on('end', () => {
+      try {
+        if (cfg.requiredKey !== null) {
+          // JSON config — validate required root key
+          let payload: any;
+          try {
+            payload = JSON.parse(body);
+          } catch (parseErr) {
+            console.error(`[API] CMS POST ${routePath} JSON parse error:`, parseErr);
+            res.status(400).json({ error: 'Invalid JSON payload' });
+            return;
           }
-          res.status(200).json({ status: 'ok', message: `${cfg.filename} saved successfully` });
-        } catch (writeErr: any) {
-          console.error(`[API] CMS POST ${routePath} write error:`, writeErr.message);
-          res.status(500).json({ error: `Disk write failed: ${writeErr.message}` });
+          if (!payload || typeof payload !== 'object' || !payload[cfg.requiredKey]) {
+            res.status(400).json({
+              error: `Invalid config payload: missing required key '${cfg.requiredKey}'`,
+            });
+            return;
+          }
+          // Backup existing file
+          if (fs.existsSync(configFilePath)) {
+            fs.copyFileSync(configFilePath, backupFilePath);
+          }
+          fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
+          fs.writeFileSync(configFilePath, JSON.stringify(payload, null, 2), 'utf8');
+        } else {
+          // Plain text (markdown)
+          if (fs.existsSync(configFilePath)) {
+            fs.copyFileSync(configFilePath, backupFilePath);
+          }
+          fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
+          fs.writeFileSync(configFilePath, body, 'utf8');
         }
-      });
-      req.on('error', (err) => {
+        
+        // Ensure response is sent with proper headers
+        res.status(200)
+          .setHeader('Content-Type', 'application/json')
+          .json({ status: 'ok', message: `${cfg.filename} saved successfully` });
+          
+      } catch (writeErr: any) {
+        console.error(`[API] CMS POST ${routePath} write error:`, writeErr.message);
+        res.status(500).json({ error: `Disk write failed: ${writeErr.message}` });
+      }
+    });
+    
+    req.on('error', (err) => {
+      console.error(`[API] CMS POST ${routePath} request error:`, err.message);
+      if (!res.headersSent) {
         res.status(500).json({ error: `Request read error: ${err.message}` });
-      });
-    } catch (err: any) {
-      console.error(`[API] CMS POST ${routePath} error:`, err.message);
-      res.status(500).json({ error: err.message });
-    }
+      }
+    });
   });
 }
 
