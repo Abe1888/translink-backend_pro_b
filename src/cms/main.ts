@@ -2353,7 +2353,26 @@ class TranslinkCMS {
             headers: { 'Content-Type': 'text/plain; charset=utf-8' },
             body: payload
         });
-        const data = await response.json();
+        
+        // Check if response has content before parsing JSON
+        const text = await response.text();
+        
+        if (!text || text.trim() === '') {
+            if (!response.ok) {
+                throw new Error('Server responded with write error (empty response)');
+            }
+            // Empty response but successful status - treat as success
+            return { status: 'ok', message: 'Saved successfully' };
+        }
+        
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch (parseError) {
+            console.error('[CMS] Failed to parse server response:', text);
+            throw new Error('Server returned invalid JSON response');
+        }
+        
         if (!response.ok) throw new Error(data.error || 'Server responded with write error');
         return data;
     }
@@ -2798,7 +2817,27 @@ class TranslinkCMS {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        const data = await response.json();
+        
+        // Check if response has content before parsing JSON
+        const contentType = response.headers.get('content-type');
+        const text = await response.text();
+        
+        if (!text || text.trim() === '') {
+            if (!response.ok) {
+                throw new Error('Server responded with write error (empty response)');
+            }
+            // Empty response but successful status - treat as success
+            return { status: 'ok', message: 'Saved successfully' };
+        }
+        
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch (parseError) {
+            console.error('[CMS] Failed to parse server response:', text);
+            throw new Error('Server returned invalid JSON response');
+        }
+        
         if (!response.ok) throw new Error(data.error || 'Server responded with write error');
         return data;
     }
