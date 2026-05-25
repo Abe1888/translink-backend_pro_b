@@ -1,0 +1,12 @@
+{
+  "languages": {
+    "EN": 1,
+    "AM": 0,
+    "AR": 1
+  },
+  "en": {
+    "global": {
+      "brand": "TRANSLINK"
+    }
+  }
+}
