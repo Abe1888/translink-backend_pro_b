@@ -69,7 +69,7 @@
       "wireframe": true
     },
     "fuelHeadCover": {
-      "color": "#e90c59",
+      "color": "#c0202f",
       "metalness": 0,
       "roughness": 0.72,
       "envMapIntensity": 0.35,
