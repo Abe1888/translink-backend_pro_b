@@ -1,11 +1,17 @@
-import langData from '../../translinkconfig/language_config.json';
+// ConfigStore provides the live runtime config fetched from /api/config/language.
+// The bundled JSON is kept ONLY as a static fallback inside ConfigStore itself.
+import { ConfigStore } from '../../translinkconfig/ConfigStore';
 
 export type Language = 'en' | 'am' | 'ar';
 
 export class TranslinkLanguageController {
     private static instance: TranslinkLanguageController;
     private currentLang: Language = 'en';
-    private config: any = langData;
+
+    // Always reads live from ConfigStore — no stale bundle data
+    private get config(): any {
+        return ConfigStore.get('language');
+    }
 
     public static getInstance(): TranslinkLanguageController {
         if (!TranslinkLanguageController.instance) {
@@ -29,7 +35,7 @@ export class TranslinkLanguageController {
     }
 
     public getEnabledLanguages(): Language[] {
-        const langStatus = this.config.languages || { EN: 1, AM: 1, AR: 0 };
+        const langStatus = this.config?.languages || { EN: 1, AM: 1, AR: 0 };
         const enabled: Language[] = [];
         if (langStatus.EN === 1) enabled.push('en');
         if (langStatus.AM === 1) enabled.push('am');
@@ -72,7 +78,7 @@ export class TranslinkLanguageController {
      */
     public t(key: string): string {
         const keys = key.split('.');
-        let current: any = this.config[this.currentLang];
+        let current: any = this.config?.[this.currentLang];
 
         for (const k of keys) {
             if (current && typeof current === 'object' && k in current) {

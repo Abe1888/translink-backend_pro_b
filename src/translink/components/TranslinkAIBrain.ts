@@ -18,7 +18,7 @@
  */
 
 import { TranslinkLanguageController } from '../controllers/TranslinkLanguageController';
-import knowledgeMarkdown from '../../translinkconfig/live-voice/knowledge.md?raw';
+import { ConfigStore } from '../../translinkconfig/ConfigStore';
 
 export interface SemanticMemoryNode {
     id: string;
@@ -58,7 +58,10 @@ export class TranslinkAIBrain {
      * Single source of truth: update knowledge.md, both client and server
      * automatically consume the latest content.
      */
-    private websiteKnowledgeBase: string = knowledgeMarkdown;
+    // Reads live from ConfigStore — always reflects latest CMS save without rebuild
+    private get websiteKnowledgeBase(): string {
+        return ConfigStore.get<string>('knowledgeMd') || '';
+    }
 
     // Semantic Memory Database for all 10 sections aligned to Fleet Telematics & IoT
     private semanticIndex: { [key: string]: SemanticMemoryNode } = {

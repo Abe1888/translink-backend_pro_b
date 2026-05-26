@@ -42,11 +42,36 @@ import gsap from 'gsap';
 gsap.registerPlugin(ScrollTrigger);
 
 import { TranslinkRobotLoader } from './components/TranslinkRobotLoader';
+// ── Runtime Config ────────────────────────────────────────────────────────────
+// MUST be imported before any component that reads config data.
+// ConfigStore fetches fresh values from /api/config/* so CMS saves are
+// immediately reflected without requiring a production rebuild.
+import { ConfigStore } from '../translinkconfig/ConfigStore';
 
 let activeSceneBridge: SceneBridge | null = null;
 
 async function init() {
-    // ── Step 0: Global Cleanup & Loader ──────────────────────────────────────────
+    // ── Step 0a: Fetch live CMS configs from server ───────────────────────────
+    // This runs BEFORE the 3D scene or any section controller initialises, so
+    // every component automatically picks up the latest saved values.
+    // On network failure the bundled defaults are used silently.
+    await ConfigStore.initialize();
+
+    // Listen for CMS saves in another tab → reload on next page visit or trigger
+    // a soft-refresh of text/config that supports it.
+    window.addEventListener('translink:config-updated', () => {
+        // Reload the page so all components re-render with fresh config.
+        // Only reload if no user interaction is currently in progress.
+        const shouldReload = !document.hasFocus() || document.visibilityState === 'hidden';
+        if (shouldReload) {
+            window.location.reload();
+        } else {
+            // Re-dispatch a softer event; individual components can respond gracefully.
+            window.dispatchEvent(new CustomEvent('translink:soft-config-refresh'));
+        }
+    });
+
+    // ── Step 0b: Global Cleanup & Loader ─────────────────────────────────────
     const app = document.getElementById('app');
     if (!app) return;
 
