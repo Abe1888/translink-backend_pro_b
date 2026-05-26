@@ -16,7 +16,8 @@
 import * as THREE from 'three';
 import { ScrollTrigger } from '@/translinkscene/core/gsap';
 import { CAMERA_CONFIG, RENDERER_CONFIG } from '../../translinkconfig/paths';
-import cameraConfigData from '../../translinkconfig/camera_config.json';
+import { ConfigStore } from '../../translinkconfig/ConfigStore';
+import cameraFallback from '../../translinkconfig/camera_config.json';
 import { setupLighting } from '../core/lights';
 import { createBaseScene } from '../core/scene';
 import { loadHDREnvironment } from './environment';
@@ -309,6 +310,29 @@ export class World {
                 this.updateStarsAndMoonTheme();
                 this.cameraSettledFrames = 0; // Wake up demand-based loop
             });
+
+            // Listen for soft config refresh from CMS updates
+            window.addEventListener('translink:soft-config-refresh', () => {
+                console.log('[World] Soft config refresh triggered');
+                // Reload camera config
+                this.loadCameraConfig();
+                // Reload waypoint config if overlay exists
+                if (this.css2dLabels) {
+                    this.css2dLabels.loadWaypointConfig();
+                }
+                // Reload behavior config in controller
+                const behaviorConfig = ConfigStore.get('behavior');
+                if (behaviorConfig && this.model) {
+                    this.meshBehavior.updateConfig(behaviorConfig);
+                    this.meshBehavior.applyConfig(this.model);
+                }
+                // Reload material configs (for 3D models)
+                if (this.model) {
+                    applyMaterials(this.model);
+                    applyThemeToMaterials(this.model, document.documentElement.classList.contains('dark'));
+                }
+                this.cameraSettledFrames = 0; // Wake up loop to re-render
+            });
         }
 
         // Start render loop
@@ -319,7 +343,7 @@ export class World {
      * Load camera configuration from JSON
      */
     private loadCameraConfig(): void {
-        const data = cameraConfigData as {
+        const data = (ConfigStore.get('camera') || cameraFallback) as {
             cameraKeyframesDesktop: CameraKeyframe[];
             cameraKeyframesTablet?: CameraKeyframe[];
             cameraKeyframesMobile?: CameraKeyframe[];

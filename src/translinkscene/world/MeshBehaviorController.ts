@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import behaviorConfigData from '../../translinkconfig/mesh_behavior_config.json';
+import { ConfigStore } from '../../translinkconfig/ConfigStore';
+import behaviorFallback from '../../translinkconfig/mesh_behavior_config.json';
 
 export interface MeshBehavior {
     wireframe?: boolean;
@@ -21,7 +22,7 @@ export class MeshBehaviorController {
     private config: MeshBehaviorConfig;
 
     constructor() {
-        this.config = behaviorConfigData as MeshBehaviorConfig;
+        this.config = (ConfigStore.get('behavior') || behaviorFallback) as MeshBehaviorConfig;
     }
 
     /**
