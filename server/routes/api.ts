@@ -22,7 +22,6 @@ const telemetryToken = process.env.VOICE_TELEMETRY_TOKEN || process.env.ADMIN_AP
 // ── Config directory resolution ────────────────────────────────────────────────
 // In production the compiled server lives at dist-server/routes/api.js.
 // process.cwd() is always the repo root on Render, so resolve from there.
-// Fall back to relative-to-file path for local compiled runs.
 const __filename_api = fileURLToPath(import.meta.url);
 const __dirname_api = path.dirname(__filename_api);
 
@@ -35,6 +34,79 @@ const resolveConfigDir = (): string => {
 };
 
 const CONFIG_DIR = resolveConfigDir();
+
+/**
+ * Returns the mirror path inside dist/src/translinkconfig/ if that directory
+ * exists. When the production static server serves files from dist/, writing
+ * here keeps the static fallback URLs (used by the CMS loader) in sync with
+ * the source-tree copies without requiring a full rebuild.
+ */
+const resolveDistConfigDir = (): string | null => {
+  const candidates = [
+    path.resolve(process.cwd(), 'dist', 'src', 'translinkconfig'),
+    path.resolve(__dirname_api, '..', '..', 'dist', 'src', 'translinkconfig'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+};
+
+/**
+ * Write data to the primary config path, AND mirror it to dist/src/translinkconfig/
+ * if that directory exists, so the static file server always serves fresh data.
+ */
+const writeConfigFile = (primaryPath: string, data: string): void => {
+  // Ensure the target directory exists
+  fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
+  fs.writeFileSync(primaryPath, data, 'utf8');
+
+  // Mirror to dist/ so the production static server also gets fresh files
+  const distDir = resolveDistConfigDir();
+  if (distDir) {
+    const relative = path.relative(CONFIG_DIR, primaryPath);
+    const distPath = path.join(distDir, relative);
+    try {
+      fs.mkdirSync(path.dirname(distPath), { recursive: true });
+      fs.writeFileSync(distPath, data, 'utf8');
+    } catch (err: any) {
+      // Non-fatal — source write already succeeded
+      console.warn(`[API] dist mirror write failed (${distPath}):`, err.message);
+    }
+  }
+};
+
+/**
+ * Bump the config version file whenever any config is saved.
+ * The frontend's ConfigStore polls /api/config/version and refreshes when the
+ * version changes, so content updates appear without a browser hard-reload.
+ */
+const VERSION_FILE = path.join(CONFIG_DIR, '_version.json');
+let configVersion = (() => {
+  try {
+    if (fs.existsSync(VERSION_FILE)) {
+      const v = JSON.parse(fs.readFileSync(VERSION_FILE, 'utf8'));
+      return typeof v.version === 'number' ? v.version : 1;
+    }
+  } catch { /* ignore */ }
+  return 1;
+})();
+
+const bumpConfigVersion = (): void => {
+  configVersion++;
+  const payload = JSON.stringify({ version: configVersion, updatedAt: new Date().toISOString() });
+  try {
+    fs.writeFileSync(VERSION_FILE, payload, 'utf8');
+    // Mirror version file to dist/ as well
+    const distDir = resolveDistConfigDir();
+    if (distDir) {
+      fs.mkdirSync(distDir, { recursive: true });
+      fs.writeFileSync(path.join(distDir, '_version.json'), payload, 'utf8');
+    }
+  } catch (err: any) {
+    console.warn('[API] Failed to write config version file:', err.message);
+  }
+};
 
 interface CmsRouteConfig {
   filename: string;
@@ -50,6 +122,16 @@ const CMS_ROUTES: Record<string, CmsRouteConfig> = {
   '/config/voice':         { filename: 'voice_config.json',  subDir: 'live-voice', requiredKey: 'voiceMetadata' },
   '/config/knowledge':     { filename: 'knowledge_config.json', subDir: 'live-voice', requiredKey: 'sync_engine' },
   '/config/knowledge-md':  { filename: 'knowledge.md',       subDir: 'live-voice', requiredKey: null },
+  // Read-only static config (not CMS-editable but must be served fresh for ConfigStore)
+  '/config/waypoint':      { filename: 'waypoint_config.json',        requiredKey: 'waypoints' },
+};
+
+// Cache-control helper — all config routes must never be cached by browsers or CDNs
+const setNoCacheHeaders = (res: Response): void => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
 };
 
 // ── CMS Rate Limiting ──────────────────────────────────────────────────────────
@@ -84,6 +166,23 @@ const requireCmsWrite = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+// ── Config version endpoint ─────────────────────────────────────────────────────
+// The frontend ConfigStore polls this to detect when a CMS save has occurred.
+router.get('/config/version', (req: Request, res: Response) => {
+  setNoCacheHeaders(res);
+  res.status(200).json({
+    version: configVersion,
+    updatedAt: (() => {
+      try {
+        if (fs.existsSync(VERSION_FILE)) {
+          return JSON.parse(fs.readFileSync(VERSION_FILE, 'utf8')).updatedAt;
+        }
+      } catch { /* ignore */ }
+      return new Date().toISOString();
+    })(),
+  });
+});
+
 // ── CMS GET/POST Handlers ──────────────────────────────────────────────────────
 for (const [routePath, cfg] of Object.entries(CMS_ROUTES)) {
   const configFilePath = cfg.subDir
@@ -93,7 +192,7 @@ for (const [routePath, cfg] of Object.entries(CMS_ROUTES)) {
     ? path.join(CONFIG_DIR, cfg.subDir, cfg.filename.replace(/\.(json|md)$/, '.backup.$1'))
     : path.join(CONFIG_DIR, cfg.filename.replace(/\.(json|md)$/, '.backup.$1'));
 
-  // GET — read config file
+  // GET — read config file (always fresh, never cached)
   router.get(routePath, (req: Request, res: Response) => {
     try {
       if (!fs.existsSync(configFilePath)) {
@@ -101,6 +200,7 @@ for (const [routePath, cfg] of Object.entries(CMS_ROUTES)) {
         return;
       }
       const raw = fs.readFileSync(configFilePath, 'utf8');
+      setNoCacheHeaders(res);
       res.status(200)
         .setHeader('Content-Type', cfg.requiredKey !== null
           ? 'application/json'
@@ -112,42 +212,58 @@ for (const [routePath, cfg] of Object.entries(CMS_ROUTES)) {
     }
   });
 
+  // Waypoint is read-only — no POST handler
+  if (routePath === '/config/waypoint') continue;
+
   // POST — write config file (rate-limited + auth-gated in production)
   router.post(routePath, requireCmsWrite, (req: Request, res: Response) => {
     try {
       if (cfg.requiredKey !== null) {
-        // JSON config — validate required root key (body already parsed by express.json())
+        // JSON config — validate required root key
         const payload = req.body;
-        
+
         if (!payload || typeof payload !== 'object' || !payload[cfg.requiredKey]) {
           res.status(400).json({
             error: `Invalid config payload: missing required key '${cfg.requiredKey}'`,
           });
           return;
         }
-        
+
         // Backup existing file
         if (fs.existsSync(configFilePath)) {
           fs.copyFileSync(configFilePath, backupFilePath);
         }
-        fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
-        fs.writeFileSync(configFilePath, JSON.stringify(payload, null, 2), 'utf8');
+        // Write to both source AND dist/ mirror
+        writeConfigFile(configFilePath, JSON.stringify(payload, null, 2));
       } else {
-        // Plain text (markdown) - use raw body
+        // Plain text (markdown)
         const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-        
+
         if (fs.existsSync(configFilePath)) {
           fs.copyFileSync(configFilePath, backupFilePath);
         }
-        fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
-        fs.writeFileSync(configFilePath, body, 'utf8');
+        writeConfigFile(configFilePath, body);
       }
-      
-      // Ensure response is sent with proper headers
+
+      // Bump the version so ConfigStore pollers know data changed
+      bumpConfigVersion();
+
+      // Rebuild RAG index if the knowledge manual was updated
+      if (routePath === '/config/knowledge-md') {
+        ragService.rebuildIndex().catch((err: any) => {
+          console.error('[API] Failed to rebuild RAG index after save:', err.message);
+        });
+      }
+
+      setNoCacheHeaders(res);
       res.status(200)
         .setHeader('Content-Type', 'application/json')
-        .json({ status: 'ok', message: `${cfg.filename} saved successfully` });
-        
+        .json({
+          status: 'ok',
+          message: `${cfg.filename} saved successfully`,
+          version: configVersion,
+        });
+
     } catch (writeErr: any) {
       console.error(`[API] CMS POST ${routePath} write error:`, writeErr.message);
       res.status(500).json({ error: `Disk write failed: ${writeErr.message}` });

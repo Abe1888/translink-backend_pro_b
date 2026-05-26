@@ -78,6 +78,7 @@ app.use('/api', (req, res, next) => {
 
 // Common middleware
 app.use(express.json());
+app.use(express.text({ type: ['text/plain', 'text/markdown', 'text/html'] }));
 
 // API Routes
 app.use('/api', apiRouter);
@@ -90,11 +91,22 @@ if (isProduction) {
 
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath, {
-      etag: true,
+      etag: false,        // Disable ETags for config files (forces re-validation)
       lastModified: true,
       setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html')) {
-          res.setHeader('Cache-Control', 'no-cache');
+        if (filePath.endsWith('index.html') || filePath.endsWith('cms.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          return;
+        }
+        // Config JSON files: NEVER cache — CMS saves must be reflected immediately
+        if (
+          filePath.includes(`${path.sep}translinkconfig${path.sep}`) &&
+          (filePath.endsWith('.json') || filePath.endsWith('.md'))
+        ) {
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
           return;
         }
         if (filePath.includes(`${path.sep}assets${path.sep}`)) {
@@ -212,6 +224,7 @@ const loadVoiceConfig = () => {
 };
 
 const getSelectedVoice = (lang: string): string => {
+  loadVoiceConfig();
   const langConfig = voiceConfigCache[lang] || voiceConfigCache['en'];
   if (langConfig?.activeVoice) return langConfig.activeVoice;
   if (langConfig?.voices) {

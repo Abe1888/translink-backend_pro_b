@@ -7,10 +7,10 @@ services:
     # Build: type-check → compile frontend (dist/) → compile server (dist-server/)
     buildCommand: npm ci && npm run build
 
-    # Start: run the compiled server directly — no devDependencies needed at runtime
+    # Start: run the compiled server directly
     startCommand: node dist-server/index.js
 
-    # Render health check — hits the /api/health endpoint defined in api.ts
+    # Render health check
     healthCheckPath: /api/health
 
     envVars:
@@ -19,15 +19,30 @@ services:
 
       - key: PORT
         value: 10000
-        # Render internally routes to this port. Must match what the server listens on.
 
       - key: GEMINI_API_KEY
         sync: false
-        # ⚠ REQUIRED — set this secret in the Render dashboard → Environment → Add Secret.
+        # ⚠ REQUIRED — set this secret in the Render dashboard.
         # Obtain from https://aistudio.google.com/apikey
 
+      - key: APP_URL
+        sync: false
+        # ⚠ REQUIRED — set to your full Render service URL.
+        # Example: https://translink-backend-ioca.onrender.com
+        # Used for WebSocket origin validation and CORS.
+
       - key: ALLOWED_ORIGINS
-        # Comma-separated allowed origins for CORS and WebSocket origin validation.
-        # Set to * to allow all origins globally (not restricted to specific domains).
         value: "*"
-        
+        # Comma-separated allowed origins for CORS and WebSocket.
+        # Replace * with your exact domain(s) for tighter security.
+        # Example: https://yourdomain.com,https://www.yourdomain.com
+
+      - key: CMS_WRITE_TOKEN
+        sync: false
+        # Optional: set a secret token to protect CMS POST routes in production.
+        # If set, all /api/config/* POST requests must include:
+        #   Authorization: Bearer <token>  or  X-Admin-Token: <token>
+
+      - key: ADMIN_API_TOKEN
+        sync: false
+        # Same as CMS_WRITE_TOKEN — used as a fallback if CMS_WRITE_TOKEN is not set.

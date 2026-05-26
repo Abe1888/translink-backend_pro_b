@@ -1,11 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NETLIFY CONFIG — STATIC FRONTEND ONLY
+#
+# ⚠ IMPORTANT — CMS WRITE API NOT AVAILABLE ON STATIC NETLIFY:
+#   The CMS uses POST /api/config/* to write JSON config files to disk.
+#   This requires a persistent Node.js server (Render, Railway, VPS, cPanel).
+#   On Netlify static hosting, the API server is NOT running — config saves
+#   will fail with a 404/redirect.
+#
+#   RECOMMENDED DEPLOYMENT ARCHITECTURE:
+#     • Backend (API + WebSocket + CMS writes) → Render / VPS / Railway
+#         node dist-server/index.js  (serves both the site AND the API)
+#     • Static fallback only (no CMS) → Netlify (serves dist/ bundle)
+#
+#   If you deploy to Render (single-server), you do NOT need Netlify at all.
+#   See DEPLOYMENT_GUIDE.md for full details.
+# ─────────────────────────────────────────────────────────────────────────────
+
 [build]
   publish = "dist"
   command = "npm run build"
 
+# ── API routes must NOT be caught by the SPA redirect ──────────────────────
+# On static Netlify these will 404, but that's the correct behavior — users
+# should be aware the API backend is missing, not silently served index.html.
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
+  force = false
+
+# ── SPA fallback (non-API routes only) ─────────────────────────────────────
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  conditions = {Role = ["*"]}
 
 [build.processing]
   skip_processing = true
@@ -13,14 +42,23 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    # Fixed CSP for WebAssembly (Meshopt Decoder) and External Fonts
-    # 'wasm-unsafe-eval' is required for Three.js Meshopt/Draco loaders to function correctly.
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(self), geolocation=(), autoplay=(*)"
+
+# Config JSON — NEVER cache; must always be fresh from the server
+[[headers]]
+  for = "/src/translinkconfig/*.json"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+[[headers]]
+  for = "/src/translinkconfig/**/*.json"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate"
 
 [[headers]]
   for = "/*.glb"

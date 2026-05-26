@@ -54,8 +54,19 @@ function cmsPlugin() {
           pathname === '/api/config/camera' ||
           pathname === '/api/config/voice' ||
           pathname === '/api/config/knowledge' ||
-          pathname === '/api/config/knowledge-md'
+          pathname === '/api/config/knowledge-md' ||
+          pathname === '/api/config/waypoint' ||
+          pathname === '/api/config/version'
         ) {
+          // Config version endpoint (dev mode)
+          if (pathname === '/api/config/version') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+            res.end(JSON.stringify({ version: 1, updatedAt: new Date().toISOString() }));
+            return;
+          }
+
           let filename = 'language_config.json';
           let requiredKey: string | null = 'languages';
           let subDir = '';
@@ -81,6 +92,9 @@ function cmsPlugin() {
             filename = 'knowledge.md';
             subDir = 'live-voice';
             requiredKey = null;
+          } else if (pathname === '/api/config/waypoint') {
+            filename = 'waypoint_config.json';
+            requiredKey = 'waypoints'; // read-only, no POST needed in dev
           }
           
           const configPath = subDir 
@@ -100,6 +114,8 @@ function cmsPlugin() {
               }
               const raw = fs.readFileSync(configPath, 'utf8');
               res.statusCode = 200;
+              res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+              res.setHeader('Pragma', 'no-cache');
               if (requiredKey !== null) {
                 res.setHeader('Content-Type', 'application/json');
               } else {
@@ -144,6 +160,15 @@ function cmsPlugin() {
                     
                     // Save
                     fs.writeFileSync(configPath, body, 'utf8');
+
+                    // Rebuild local RAG index dynamically in dev mode
+                    import('./server/brain/knowledge/RagService.ts').then(({ ragService }) => {
+                      ragService.rebuildIndex().catch((err: any) => {
+                        console.error('[Vite CMS] Failed to rebuild RAG index:', err.message);
+                      });
+                    }).catch((err: any) => {
+                      console.error('[Vite CMS] Failed to import RagService:', err.message);
+                    });
                   }
                   
                   res.statusCode = 200;
