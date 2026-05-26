@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { gsap } from '@/translinkscene/core/gsap';
+import { ConfigStore } from '@/translinkconfig/ConfigStore';
 
 // --------------------------------------------------------------------------------------------------
 // COLOR MANAGEMENT - Progress-based color selection
@@ -273,10 +274,10 @@ export class Waypoint {
      */
     async loadConfig(): Promise<void> {
         try {
-            const data = (await import('@/translinkconfig/waypoint_config.json'))
-                .default as unknown as { waypoints: WaypointConfigJSON[] };
+            // Use ConfigStore for live data — no stale bundle needed
+            const data = ConfigStore.get<{ waypoints: WaypointConfigJSON[] }>('waypoint');
 
-            const waypoints: WaypointConfigJSON[] = data.waypoints;
+            const waypoints: WaypointConfigJSON[] = data?.waypoints ?? [];
             this.configs.clear();
             waypoints.forEach((raw) => {
                 const config = mapJSONToConfig(raw);

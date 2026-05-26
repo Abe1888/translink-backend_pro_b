@@ -5,11 +5,10 @@
  */
 
 import * as THREE from 'three';
-import materialConfigData from '../../translinkconfig/mesh_material_config.json';
-
-const materialsConfig = materialConfigData.materials as Record<string, any>;
+import { ConfigStore } from '../../translinkconfig/ConfigStore';
 
 export function applyMaterials(model: THREE.Group): void {
+    const materialsConfig = ConfigStore.get('material').materials as Record<string, any>;
     model.traverse((child: THREE.Object3D) => {
         if (!(child as THREE.Mesh).isMesh) return;
 
@@ -144,6 +143,7 @@ export function applyMaterials(model: THREE.Group): void {
  * glowing red fuel cover accents, and neon tech brand logos.
  */
 export function applyThemeToMaterials(model: THREE.Group, isDark: boolean): void {
+    const materialsConfig = ConfigStore.get('material').materials as Record<string, any>;
     model.traverse((child: THREE.Object3D) => {
         if (!(child as THREE.Mesh).isMesh) return;
 
@@ -153,94 +153,124 @@ export function applyThemeToMaterials(model: THREE.Group, isDark: boolean): void
         if (!mat || !mat.isMeshStandardMaterial) return;
 
         switch (name) {
-            case 'virtual_studio':
-                mat.color.set(isDark ? '#0c0e12' : '#f5f1e8');
-                mat.roughness = 1.0;
-                mat.metalness = 0.0;
+            case 'virtual_studio': {
+                const config = materialsConfig.virtualStudio || {};
+                const baseColor = config.color || '#f5f1e8';
+                mat.color.set(isDark ? '#0c0e12' : baseColor);
+                mat.roughness = config.roughness !== undefined ? config.roughness : 1.0;
+                mat.metalness = config.metalness !== undefined ? config.metalness : 0.0;
                 break;
+            }
 
             case 'Truck':
             case 'Cab_door':
-            case 'Cab_Door_glass_frame':
-                mat.color.set(isDark ? '#1d2330' : '#d8d4d0');
-                mat.roughness = isDark ? 0.24 : 0.95;
-                mat.metalness = isDark ? 0.72 : 0.0;
-                mat.envMapIntensity = isDark ? 2.6 : 0.5;
+            case 'Cab_Door_glass_frame': {
+                const config = materialsConfig.truckBody || {};
+                const baseColor = config.color || '#d8d4d0';
+                mat.color.set(isDark ? '#1d2330' : baseColor);
+                mat.roughness = isDark ? 0.24 : (config.roughness !== undefined ? config.roughness : 0.95);
+                mat.metalness = isDark ? 0.72 : (config.metalness !== undefined ? config.metalness : 0.0);
+                mat.envMapIntensity = isDark ? 2.6 : (config.envMapIntensity !== undefined ? config.envMapIntensity : 0.5);
                 if ('clearcoat' in mat) {
-                    mat.clearcoat = 1.0;
-                    mat.clearcoatRoughness = isDark ? 0.08 : 0.05;
+                    mat.clearcoat = config.clearcoat !== undefined ? config.clearcoat : 1.0;
+                    mat.clearcoatRoughness = isDark ? 0.08 : (config.clearcoatRoughness !== undefined ? config.clearcoatRoughness : 0.05);
                 }
                 break;
+            }
 
-            case 'Fuel_tank':
-                mat.color.set(isDark ? '#1a1f29' : '#d1d5db');
-                mat.roughness = isDark ? 0.2 : 0.38;
-                mat.metalness = 0.95;
-                mat.envMapIntensity = isDark ? 1.6 : 0.3;
+            case 'Fuel_tank': {
+                const config = materialsConfig.fuelTank || {};
+                const baseColor = config.color || '#d1d5db';
+                mat.color.set(isDark ? '#1a1f29' : baseColor);
+                mat.roughness = isDark ? 0.2 : (config.roughness !== undefined ? config.roughness : 0.38);
+                mat.metalness = config.metalness !== undefined ? config.metalness : 0.95;
+                mat.envMapIntensity = isDark ? 1.6 : (config.envMapIntensity !== undefined ? config.envMapIntensity : 0.3);
                 break;
+            }
 
-            case 'Fuel_Head_cover':
-                mat.color.set('#c0202f');
-                mat.roughness = isDark ? 0.1 : 0.72;
-                mat.metalness = isDark ? 0.3 : 0.0;
+            case 'Fuel_Head_cover': {
+                const config = materialsConfig.fuelHeadCover || {};
+                const baseColor = config.color || '#c0202f';
+                mat.color.set(baseColor);
+                mat.roughness = isDark ? 0.1 : (config.roughness !== undefined ? config.roughness : 0.72);
+                mat.metalness = isDark ? 0.3 : (config.metalness !== undefined ? config.metalness : 0.0);
+                mat.envMapIntensity = config.envMapIntensity !== undefined ? config.envMapIntensity : 0.35;
                 if ('clearcoat' in mat) {
-                    mat.clearcoat = isDark ? 0.9 : 0.1;
-                    mat.clearcoatRoughness = isDark ? 0.1 : 0.35;
+                    mat.clearcoat = isDark ? 0.9 : (config.clearcoat !== undefined ? config.clearcoat : 0.1);
+                    mat.clearcoatRoughness = isDark ? 0.1 : (config.clearcoatRoughness !== undefined ? config.clearcoatRoughness : 0.35);
                 }
                 if (mat.emissive) {
-                    mat.emissive.set(isDark ? '#c0202f' : '#000000');
-                    mat.emissiveIntensity = isDark ? 0.25 : 0.0;
+                    const emissiveColor = config.emissive || baseColor;
+                    mat.emissive.set(isDark ? emissiveColor : '#000000');
+                    mat.emissiveIntensity = isDark ? (config.emissiveIntensity !== undefined ? config.emissiveIntensity : 0.25) : 0.0;
                 }
                 break;
+            }
 
-            case 'Fuel_Head':
-                mat.color.set(isDark ? '#13161d' : '#161616');
-                mat.roughness = isDark ? 0.2 : 0.35;
-                mat.metalness = isDark ? 0.6 : 0.4;
-                if ('clearcoat' in mat) {
-                    mat.clearcoat = isDark ? 0.8 : 0.6;
-                    mat.clearcoatRoughness = isDark ? 0.1 : 0.1;
-                }
+            case 'Fuel_Head': {
+                const config = materialsConfig.fuelHead || {};
+                const baseColor = config.color || '#161616';
+                mat.color.set(isDark ? '#13161d' : baseColor);
+                mat.roughness = isDark ? 0.2 : (config.roughness !== undefined ? config.roughness : 0.35);
+                mat.metalness = isDark ? 0.6 : (config.metalness !== undefined ? config.metalness : 0.4);
                 break;
+            }
 
-            case 'Prob':
-                mat.color.set('#fafafa');
-                mat.roughness = isDark ? 0.05 : 0.1;
-                mat.metalness = 0.95;
-                mat.envMapIntensity = isDark ? 1.6 : 1.0;
+            case 'Prob': {
+                const config = materialsConfig.prob || {};
+                const baseColor = config.color || '#fafafa';
+                mat.color.set(baseColor);
+                mat.roughness = isDark ? 0.05 : (config.roughness !== undefined ? config.roughness : 0.1);
+                mat.metalness = config.metalness !== undefined ? config.metalness : 0.95;
+                mat.envMapIntensity = isDark ? 1.6 : (config.envMapIntensity !== undefined ? config.envMapIntensity : 1.0);
                 break;
+            }
 
-            case 'Base':
-                mat.color.set(isDark ? '#1a1e26' : '#2a2a2a');
-                mat.roughness = isDark ? 0.25 : 0.4;
-                mat.metalness = isDark ? 0.85 : 0.8;
+            case 'Base': {
+                const config = materialsConfig.base || {};
+                const baseColor = config.color || '#2a2a2a';
+                mat.color.set(isDark ? '#1a1e26' : baseColor);
+                mat.roughness = isDark ? 0.25 : (config.roughness !== undefined ? config.roughness : 0.4);
+                mat.metalness = isDark ? 0.85 : (config.metalness !== undefined ? config.metalness : 0.8);
                 break;
+            }
 
-            case 'Filter_Wireframe':
-                mat.color.set('#c0202f');
+            case 'Filter_Wireframe': {
+                const config = materialsConfig.filterWireframe || {};
+                const baseColor = config.color || '#c0202f';
+                mat.color.set(baseColor);
                 if (mat.emissive) {
-                    mat.emissive.set(isDark ? '#c0202f' : '#000000');
-                    mat.emissiveIntensity = isDark ? 0.4 : 0.0;
+                    const emissiveColor = config.emissive || baseColor;
+                    mat.emissive.set(isDark ? emissiveColor : '#000000');
+                    mat.emissiveIntensity = isDark ? (config.emissiveIntensity !== undefined ? config.emissiveIntensity : 0.4) : 0.0;
                 }
                 break;
+            }
 
             case 'Text_Translink_pro':
-            case 'Logo_Translink_pro':
-                mat.color.set('#ffffff');
+            case 'Logo_Translink_pro': {
+                const config = materialsConfig.brandLogo || {};
+                const baseColor = config.color || '#ffffff';
+                mat.color.set(baseColor);
                 if (mat.emissive) {
-                    mat.emissive.set('#ffffff');
-                    mat.emissiveIntensity = isDark ? 1.3 : 0.8;
+                    const emissiveColor = config.emissive || baseColor;
+                    mat.emissive.set(emissiveColor);
+                    mat.emissiveIntensity = isDark ? (config.emissiveIntensity !== undefined ? config.emissiveIntensity : 1.3) : 0.8;
                 }
                 break;
+            }
 
             case 'Bolt_01':
             case 'Bolt_02':
             case 'Bolt_03':
-            case 'Bolt_04':
-                mat.color.set(isDark ? '#1f2937' : '#2a2a2a');
-                mat.roughness = isDark ? 0.2 : 0.4;
-                mat.metalness = isDark ? 0.9 : 0.8;
+            case 'Bolt_04': {
+                const config = materialsConfig.bolt || {};
+                const baseColor = config.color || '#2a2a2a';
+                mat.color.set(isDark ? '#1f2937' : baseColor);
+                mat.roughness = isDark ? 0.2 : (config.roughness !== undefined ? config.roughness : 0.4);
+                mat.metalness = isDark ? 0.9 : (config.metalness !== undefined ? config.metalness : 0.8);
                 break;
+            }
         }
 
         mat.needsUpdate = true;

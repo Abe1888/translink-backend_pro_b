@@ -18,7 +18,7 @@ import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { gsap } from '@/translinkscene/core/gsap';
 import { getWaypointScale } from '@/translinkscene/systems/responsiveSystem';
-import waypointConfigData from '@/translinkconfig/waypoint_config.json';
+import { ConfigStore } from '@/translinkconfig/ConfigStore';
 import { TranslinkLanguageController } from '@/translink/controllers/TranslinkLanguageController';
 
 // --------------------------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ export class UIOverlay {
 
     /** Load waypoint content mappings from static config (no async I/O) */
     loadWaypointConfig(): void {
-        const data = waypointConfigData as any;
+        const data = ConfigStore.get('waypoint') as any;
         const lang = TranslinkLanguageController.getInstance();
 
         this.waypointMappings.clear();

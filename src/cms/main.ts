@@ -1354,7 +1354,7 @@ class TranslinkCMS {
             if (matId === 'prob') humanLabel = 'Precision Probe';
             if (matId === 'fuelTank') humanLabel = 'Fuel Tank';
             if (matId === 'fuelHead') humanLabel = 'Sensor Head';
-            if (matId === 'fuelHeadCover') humanLabel = 'Harness Cover';
+            if (matId === 'fuelHeadCover') humanLabel = 'Sensor Head Cover';
             if (matId === 'brandLogo') humanLabel = 'Brand Emissive Logo';
             if (matId === 'filterWireframe') humanLabel = 'Filter Wireframe';
             if (matId === 'virtualStudio') humanLabel = 'Virtual Studio';
@@ -2790,6 +2790,22 @@ class TranslinkCMS {
         try {
             await Promise.all(savesList);
             this.showToast('Config files successfully saved and backed up on disk', 'success');
+
+            // ── Propagate saves to live website tabs ──────────────────────────
+            // Broadcast so any open browser tab running the main site re-fetches
+            // configs via ConfigStore and reflects changes without a hard reload.
+            try {
+                const bc = new BroadcastChannel('translink:cms');
+                bc.postMessage({ type: 'cms:saved', timestamp: Date.now() });
+                bc.close();
+            } catch {
+                // BroadcastChannel unavailable — fall back to localStorage event
+            }
+            // localStorage fallback covers same-origin tabs where BroadcastChannel
+            // is blocked (e.g., some embedded iframe environments).
+            try {
+                localStorage.setItem('translink:cms:last-save', String(Date.now()));
+            } catch { /* quota or security restrictions */ }
 
             // Sync deep states to lock changes
             this.originalConfig = JSON.parse(JSON.stringify(this.currentConfig));
