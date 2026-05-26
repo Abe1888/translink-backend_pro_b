@@ -203,11 +203,15 @@ let voiceConfigCache: Record<string, any> = {};
 const loadVoiceConfig = () => {
   try {
     // In production dist-server/, __dirname is <root>/dist-server/
-    // The config file lives at src/translinkconfig/live-voice/voice_config.json (source tree)
-    // We look for it relative to the project root (one level up from dist-server/).
+    // The config file lives at src/translinkconfig/live-voice/voice_config.json (source tree).
+    // We also check dist/src/translinkconfig/ for deployments where src/ is absent (e.g. Render).
     const candidates = [
-      path.resolve(__dirname, '..', 'src', 'translinkconfig', 'live-voice', 'voice_config.json'),
+      // Source tree — present in local dev and repo-root deployments
       path.resolve(process.cwd(), 'src', 'translinkconfig', 'live-voice', 'voice_config.json'),
+      path.resolve(__dirname, '..', 'src', 'translinkconfig', 'live-voice', 'voice_config.json'),
+      // Dist copy — present in pure-production deployments where src/ is absent
+      path.resolve(process.cwd(), 'dist', 'src', 'translinkconfig', 'live-voice', 'voice_config.json'),
+      path.resolve(__dirname, '..', 'dist', 'src', 'translinkconfig', 'live-voice', 'voice_config.json'),
     ];
     for (const configPath of candidates) {
       if (fs.existsSync(configPath)) {
@@ -216,7 +220,7 @@ const loadVoiceConfig = () => {
         return;
       }
     }
-    console.warn('[Server] voice_config.json not found — using default voice Zephyr.');
+    console.warn('[Server] voice_config.json not found in any candidate path — using default voice Zephyr.');
   } catch (err) {
     console.error('[Server] Error loading voice config:', err);
     voiceConfigCache = {};

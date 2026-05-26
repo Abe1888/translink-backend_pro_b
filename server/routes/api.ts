@@ -28,9 +28,20 @@ const __dirname_api = path.dirname(__filename_api);
 const resolveConfigDir = (): string => {
   const fromCwd = path.resolve(process.cwd(), 'src', 'translinkconfig');
   if (fs.existsSync(fromCwd)) return fromCwd;
+  
   // dist-server/routes/ → go up two levels to repo root, then into src/
   const fromFile = path.resolve(__dirname_api, '..', '..', 'src', 'translinkconfig');
-  return fromFile;
+  if (fs.existsSync(fromFile)) return fromFile;
+
+  // Production fallback: if running in compiled dist-server/ mode and src/ is absent,
+  // read/write directly to dist/src/translinkconfig/
+  const fromDist = path.resolve(__dirname_api, '..', '..', 'dist', 'src', 'translinkconfig');
+  if (fs.existsSync(fromDist)) return fromDist;
+
+  const fromCwdDist = path.resolve(process.cwd(), 'dist', 'src', 'translinkconfig');
+  if (fs.existsSync(fromCwdDist)) return fromCwdDist;
+
+  return fromCwd; // default fallback
 };
 
 const CONFIG_DIR = resolveConfigDir();

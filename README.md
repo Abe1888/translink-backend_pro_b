@@ -6,8 +6,8 @@ An immersive, infinite-scroll 3D telematics and IoT presentation platform. The w
 
 ## 🚀 Active Project Entry Point
 
-* **Production Entry Point:** [`index.html`](file:///c:/Users/Abebaw/Desktop/TRANSLINK_CMS/TRANSLINK_WEB/index.html) — Unified scroll-driven 3D platform.
-* **Core Application Bootstrapper:** [`src/translink/main.ts`](file:///c:/Users/Abebaw/Desktop/TRANSLINK_CMS/TRANSLINK_WEB/src/translink/main.ts) — Orchestrates the mounting, smooth scrolling, HUD components, and the 3D SceneBridge connector.
+* **Production Entry Point:** [index.html](file:///c:/Users/Abebaw/Desktop/TRANSLINK_CMS/TRANSLINK_WEB/deployment_fixed/project-fixed/index.html) — Unified scroll-driven 3D platform.
+* **Core Application Bootstrapper:** [src/translink/main.ts](file:///c:/Users/Abebaw/Desktop/TRANSLINK_CMS/TRANSLINK_WEB/deployment_fixed/project-fixed/src/translink/main.ts) — Orchestrates the mounting, smooth scrolling, HUD components, and the 3D SceneBridge connector.
 
 ---
 
